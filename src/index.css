@@ -103,6 +103,17 @@ html, body {
   30%           { transform: translateY(-5px); opacity: 1; }
 }
 
+@keyframes cardPopIn {
+  0% {
+    opacity: 0;
+    transform: translateY(22px) scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @keyframes modalFadeIn {
   from { opacity: 0; background-color: rgba(15, 23, 42, 0); backdrop-filter: blur(0px); -webkit-backdrop-filter: blur(0px); }
   to   { opacity: 1; background-color: rgba(15, 23, 42, 0.4); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
@@ -141,6 +152,28 @@ html, body {
     opacity: 1;
     transform: scaleY(1) translateY(0);
   }
+}
+
+/* ─── Fluid Tab View Switch Transition ───────────────── */
+@keyframes viewFadeIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.985) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.tab-view-transition {
+  animation: viewFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex: 1;
 }
 
 /* ─── Global Background Blobs & Grid Pattern ─────────── */
@@ -249,23 +282,10 @@ html, body {
 }
 
 .platform-stack-item:hover {
-  transform: scale(1.22) translateY(-4px) !important;
+  transform: scale(1.12) translateY(-2px) !important;
   z-index: 10 !important;
-  border-color: var(--accent-light) !important;
-}
-
-/* Customized specific hover shadow colors */
-.platform-stack-item[title="Mercado Livre"]:hover {
-  box-shadow: 0 6px 15px rgba(243, 156, 18, 0.4) !important;
-}
-.platform-stack-item[title="OLX"]:hover {
-  box-shadow: 0 6px 15px rgba(140, 82, 255, 0.4) !important;
-}
-.platform-stack-item[title="Amazon"]:hover {
-  box-shadow: 0 6px 15px rgba(211, 84, 0, 0.4) !important;
-}
-.platform-stack-item[title="GGMax e outros"]:hover {
-  box-shadow: 0 6px 15px rgba(0, 206, 201, 0.4) !important;
+  border-color: var(--bg-primary) !important;
+  box-shadow: none !important;
 }
 
 /* ─── Modal animations ───────────────────────────────── */
@@ -327,4 +347,18 @@ html, body {
 }
 .new-search-btn-premium:active {
   transform: scale(0.96);
+}
+
+.load-more-btn-hover {
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+.load-more-btn-hover:hover {
+  background-color: var(--bg-primary) !important;
+  border-color: var(--accent-light) !important;
+  color: var(--accent) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(90, 122, 106, 0.12) !important;
+}
+.load-more-btn-hover:active {
+  transform: scale(0.97);
 }

@@ -1,37 +1,23 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   searchApi,
-  type ListingItem,
   type Category,
   type Platform,
   type SortBy,
 } from "./services/searchApi";
-import {
-  Search,
-  Layers,
-  ShoppingBag,
-  Info,
-  X,
-  CheckCircle2,
-} from "lucide-react";
-import { WelcomeHero } from "./features/search/components/WelcomeHero.js";
-import { ListingGrid } from "./features/search/components/ListingGrid.js";
-import { FilterStrip } from "./features/search/components/FilterStrip.js";
-
-interface ChatMessage {
-  id: string;
-  sender: "user" | "system";
-  text: string;
-  timestamp: Date;
-  isSearching?: boolean;
-  results?: ListingItem[];
-  meta?: {
-    fromCache: boolean;
-    total: number;
-    category: string;
-    query: string;
-  };
-}
+import { Search, Home } from "lucide-react";
+import { WelcomeHero } from "./features/search/components/WelcomeHero";
+import { FilterStrip } from "./features/search/components/FilterStrip";
+import { Header } from "./features/search/components/Header";
+import { IntegratedPlatformsModal } from "./features/search/components/IntegratedPlatformsModal";
+import { AnalyticsDashboardView } from "./features/analytics/components/AnalyticsDashboardView";
+import { FavoritesView } from "./features/favorites/components/FavoritesView";
+import { StoresCreditsView } from "./features/sources/components/StoresCreditsView";
+import { ProductDetailsModal } from "./features/search/components/ProductDetailsModal";
+import { ProductComparisonModal } from "./features/comparison/components/ProductComparisonModal";
+import { AuthModal, type UserProfile } from "./features/auth/components/AuthModal";
+import { ChatMessageItem, type ChatMessage } from "./features/search/components/ChatMessageItem";
+import { ListingItem } from "./services/searchApi";
 
 export default function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -50,27 +36,88 @@ export default function App() {
   const [maxPrice, setMaxPrice] = useState<number | "">("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+  const [activeTab, setActiveTab] = useState<"search" | "analytics" | "favorites" | "sources">("search");
+  const [selectedFavProduct, setSelectedFavProduct] = useState<ListingItem | null>(null);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [comparedItems, setComparedItems] = useState<ListingItem[]>([]);
+  const [isComparisonModalOpen, setIsComparisonModalOpen] = useState(false);
+
+  const [user, setUser] = useState<UserProfile | null>(() => {
+    try {
+      const saved = localStorage.getItem("price_scraper_user");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const handleLoginSuccess = (userProfile: UserProfile) => {
+    setUser(userProfile);
+    try {
+      localStorage.setItem("price_scraper_user", JSON.stringify(userProfile));
+    } catch {}
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    try {
+      localStorage.removeItem("price_scraper_user");
+    } catch {}
+  };
+
+  const [favorites, setFavorites] = useState<ListingItem[]>(() => {
+    try {
+      const saved = localStorage.getItem("price_scraper_favorites");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const getItemKey = (item: ListingItem) => item.id || item.externalId || item.url;
+
+  const toggleFavorite = (item: ListingItem) => {
+    setFavorites((prev) => {
+      const key = getItemKey(item);
+      const exists = prev.some((f) => getItemKey(f) === key);
+      const next = exists ? prev.filter((f) => getItemKey(f) !== key) : [...prev, item];
+      try {
+        localStorage.setItem("price_scraper_favorites", JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const toggleCompare = (item: ListingItem) => {
+    setComparedItems((prev) => {
+      const key = getItemKey(item);
+      const exists = prev.some((c) => getItemKey(c) === key);
+      if (exists) {
+        return prev.filter((c) => getItemKey(c) !== key);
+      } else {
+        if (prev.length >= 4) {
+          alert("Você pode comparar no máximo 4 ofertas simultaneamente.");
+          return prev;
+        }
+        return [...prev, item];
+      }
+    });
+  };
 
   const handleCloseModal = () => {
     setIsClosing(true);
     setTimeout(() => {
       setIsModalOpen(false);
       setIsClosing(false);
-    }, 220); // matching CSS fade-out animation length
+    }, 220);
   };
+
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const handleNewSearch = () => {
-    setMessages([
-      {
-        id: "welcome",
-        sender: "system",
-        text: "",
-        timestamp: new Date(),
-      },
-    ]);
+    window.location.reload();
   };
-
-  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (messages.length > 1) {
@@ -121,7 +168,7 @@ export default function App() {
             return {
               ...msg,
               isSearching: false,
-              text: `Busca finalizada! Encontrei ${res.total} anúncios. Veja abaixo a listagem de ofertas:`,
+              text: `Busca finalizada! Encontrei ${res.total} ofertas para "${currentQuery}".`,
               results: res.results || [],
               meta: {
                 fromCache: res.fromCache,
@@ -141,7 +188,7 @@ export default function App() {
             return {
               ...msg,
               isSearching: false,
-              text: `Não foi possível obter os dados. Certifique-se de que o backend está ativo na porta 3000. Detalhes: ${err.message}`,
+              text: `Erro ao obter dados: ${err.message}`,
             };
           }
           return msg;
@@ -168,6 +215,16 @@ export default function App() {
       />
 
       <div style={styles.inputContainer}>
+        {!isWelcomeState && (
+          <button
+            type="button"
+            onClick={handleNewSearch}
+            style={styles.homeInputBtn}
+            title="Voltar ao Início"
+          >
+            <Home size={16} color="var(--accent)" />
+          </button>
+        )}
         <input
           type="text"
           placeholder="Pesquise produtos em tempo real (ex: iPhone 13, notebook, conta valorant...)"
@@ -184,229 +241,197 @@ export default function App() {
 
   return (
     <div style={styles.appContainer}>
-      {/* Global Background Pastel Blobs */}
+      {/* Background Blobs */}
       <div className="global-blob blob-1" />
       <div className="global-blob blob-2" />
       <div className="global-blob blob-3" />
       <div className="global-grid-bg" />
 
       <div style={styles.chatArea}>
-        {/* Topbar */}
-        <div style={styles.topbar} className="topbar-glow">
-          <div style={styles.brand}>
-            <h1 style={styles.brandTitle}>
-              PriceScraper
-              <span style={styles.brandBadge}>Real-Time Agent</span>
-            </h1>
+        {/* Header Component */}
+        <Header
+          activeTab={activeTab}
+          favoritesCount={favorites.length}
+          user={user}
+          onOpenAuth={() => setIsAuthOpen(true)}
+          onLogout={handleLogout}
+          onTabChange={setActiveTab}
+          onNewSearch={handleNewSearch}
+        />
+
+        {activeTab === "analytics" ? (
+          <div key="analytics" className="tab-view-transition">
+            <AnalyticsDashboardView />
           </div>
-          {!isWelcomeState && (
-            <button
-              onClick={handleNewSearch}
-              style={styles.newSearchBtn}
-              className="new-search-btn-premium"
+        ) : activeTab === "favorites" ? (
+          <div key="favorites" className="tab-view-transition">
+            <FavoritesView
+              favorites={favorites}
+              onToggleFavorite={toggleFavorite}
+              onSelectProduct={(prod) => setSelectedFavProduct(prod)}
+            />
+          </div>
+        ) : activeTab === "sources" ? (
+          <div key="sources" className="tab-view-transition">
+            <StoresCreditsView />
+          </div>
+        ) : (
+          <div key="search" className="tab-view-transition">
+            {/* Messages & Workspace Area */}
+            <div
+              ref={messagesContainerRef}
+              style={{
+                ...styles.messagesContainer,
+                ...(isWelcomeState
+                  ? { display: "flex", alignItems: "center", justifyContent: "center", paddingBottom: "12vh" }
+                  : { paddingBottom: "140px" }),
+              }}
             >
-              <Search size={13} style={{ marginRight: "6px" }} />
-              Nova Busca
-            </button>
-          )}
-        </div>
-
-        {/* Mensagens e Fluxo de Conversa */}
-        <div style={{
-          ...styles.messagesContainer,
-          ...(isWelcomeState ? { display: "flex", alignItems: "center", justifyContent: "center", paddingBottom: "12vh" } : {})
-        }}>
-          <div style={{
-            ...styles.messagesInner,
-            ...(isWelcomeState ? { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", flex: 1, gap: "32px" } : {})
-          }}>
-            {isWelcomeState ? (
-              <>
-                <WelcomeHero />
-                <div className="hero-cta-input-wrapper" style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", maxWidth: "660px", filter: "drop-shadow(0 0 24px rgba(108,92,231,0.15))" }}>
-                  {renderSearchForm()}
-                </div>
-                
-                {/* Circular overlapping stacked logos + "+" indicator */}
-                <div style={{ ...styles.platformLogoWrapper, marginTop: "64px" }} onClick={() => setIsModalOpen(true)}>
-                  <span style={styles.platformLogoText}>Buscando em:</span>
-                  <div style={styles.platformLogoStack}>
-                    <span className="platform-stack-item-wrapper">
-                      <img src="/platforms/mercadoLivre.png" alt="Mercado Livre" className="platform-stack-item" style={{ ...styles.platformCircle, backgroundColor: "#ffd800", zIndex: 3 }} title="Mercado Livre" />
-                    </span>
-                    <span className="platform-stack-item-wrapper">
-                      <img src="/platforms/olx.png" alt="OLX" className="platform-stack-item" style={{ ...styles.platformCircle, backgroundColor: "#8c52ff", zIndex: 2 }} title="OLX" />
-                    </span>
-                    <span className="platform-stack-item-wrapper">
-                      <img src="/platforms/amazon.png" alt="Amazon" className="platform-stack-item" style={{ ...styles.platformCircle, backgroundColor: "#ff9900", zIndex: 1 }} title="Amazon" />
-                    </span>
-                    <span className="platform-stack-item-wrapper">
-                      <div className="platform-stack-item" style={{ ...styles.platformCircle, backgroundColor: "#141424", border: "1px solid var(--border)", color: "#00cec9" }} title="GGMax e outros">+</div>
-                    </span>
-                  </div>
-                </div>
-              </>
-            ) : (
-              messages.slice(1).map((msg) => (
-                <div
-                  key={msg.id}
-                  style={{
-                    ...styles.messageWrapper,
-                    justifyContent: msg.sender === "user" ? "flex-end" : "flex-start",
-                  }}
-                >
-                  {msg.sender === "system" && (
-                    <div style={styles.avatar}>
-                      <Search size={14} color="var(--accent-light)" />
-                    </div>
-                  )}
-
-                  <div style={{
-                    ...styles.messageBubbleContainer,
-                    alignItems: msg.sender === "user" ? "flex-end" : "flex-start",
-                  }}>
+              <div
+                style={{
+                  ...styles.messagesInner,
+                  ...(isWelcomeState
+                    ? {
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        textAlign: "center",
+                        flex: 1,
+                        gap: "32px",
+                      }
+                    : {}),
+                }}
+              >
+                {isWelcomeState ? (
+                  <>
+                    <WelcomeHero />
                     <div
+                      className="hero-cta-input-wrapper"
                       style={{
-                        ...styles.messageBubble,
-                        background: msg.sender === "user" ? "var(--bg-bubble-user)" : "var(--bg-bubble-ai)",
-                        border: msg.sender === "user" ? "none" : "1px solid var(--border)",
-                        color: msg.sender === "user" ? "#ffffff" : "var(--text-primary)",
-                        alignSelf: msg.sender === "user" ? "flex-end" : "flex-start",
-                        borderRadius: msg.sender === "user" ? "18px 18px 4px 18px" : "var(--radius-lg)",
+                        width: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        maxWidth: "660px",
+                        filter: "drop-shadow(0 0 24px rgba(108,92,231,0.15))",
                       }}
                     >
-                      <div style={styles.messageText}>{msg.text}</div>
-
-                      {msg.isSearching && (
-                        <div style={styles.loadingDots}>
-                          <span style={styles.dot}></span>
-                          <span style={{ ...styles.dot, animationDelay: "0.2s" }}></span>
-                          <span style={{ ...styles.dot, animationDelay: "0.4s" }}></span>
-                        </div>
-                      )}
-
-                      {msg.meta && (
-                        <div style={styles.searchMetaCard}>
-                          <div style={styles.metaBadge}>
-                            <Layers size={11} />
-                            <span>Cat: {msg.meta.category}</span>
-                          </div>
-                          <div style={styles.metaBadge}>
-                            <Info size={11} />
-                            <span>{msg.meta.fromCache ? "Cache (30m)" : "Busca Direta"}</span>
-                          </div>
-                          <div style={styles.metaBadge}>
-                            <ShoppingBag size={11} />
-                            <span>{msg.meta.total} itens</span>
-                          </div>
-                        </div>
-                      )}
+                      {renderSearchForm()}
                     </div>
 
-                    {/* Grid de Ofertas Modular */}
-                    {msg.results && msg.results.length > 0 && (
-                      <ListingGrid results={msg.results} />
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-        </div>
+                    {/* Overlapping Platform Logos */}
+                    <div
+                      style={{ ...styles.platformLogoWrapper, marginTop: "64px" }}
+                      onClick={() => setIsModalOpen(true)}
+                    >
+                      <span style={styles.platformLogoText}>Buscando em:</span>
+                      <div style={styles.platformLogoStack}>
+                        <span className="platform-stack-item-wrapper">
+                          <img
+                            src="/platforms/mercadoLivre.png"
+                            alt="Mercado Livre"
+                            className="platform-stack-item"
+                            style={{ ...styles.platformCircle, backgroundColor: "#ffd800", zIndex: 3 }}
+                            title="Mercado Livre"
+                          />
+                        </span>
+                        <span className="platform-stack-item-wrapper">
+                          <img
+                            src="/platforms/olx.png"
+                            alt="OLX"
+                            className="platform-stack-item"
+                            style={{ ...styles.platformCircle, backgroundColor: "#8c52ff", zIndex: 2 }}
+                            title="OLX"
+                          />
+                        </span>
+                        <span className="platform-stack-item-wrapper">
+                          <img
+                            src="/platforms/amazon.png"
+                            alt="Amazon"
+                            className="platform-stack-item"
+                            style={{ ...styles.platformCircle, backgroundColor: "#ff9900", zIndex: 1 }}
+                            title="Amazon"
+                          />
+                        </span>
+                        <span className="platform-stack-item-wrapper">
+                          <div
+                            className="platform-stack-item"
+                            style={{
+                              ...styles.platformCircle,
+                              backgroundColor: "var(--bg-secondary)",
+                              border: "1.5px solid var(--border)",
+                              color: "var(--accent)",
+                            }}
+                            title="GGMax e outros"
+                          >
+                            +
+                          </div>
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {messages.slice(1).map((msg, idx, arr) => (
+                      <ChatMessageItem
+                        key={msg.id}
+                        msg={msg}
+                        isLatest={idx === arr.length - 1}
+                        favorites={favorites}
+                        comparedItems={comparedItems}
+                        onToggleFavorite={toggleFavorite}
+                        onToggleCompare={toggleCompare}
+                        onOpenComparisonModal={() => setIsComparisonModalOpen(true)}
+                      />
+                    ))}
+                    <div style={{ height: "220px", width: "100%", flexShrink: 0, pointerEvents: "none" }} />
+                  </>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+            </div>
 
+            {/* Bottom Search Controls when viewing results */}
+            {!isWelcomeState && (
+              <div style={styles.controlsArea}>
+                {renderSearchForm()}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Modal - Sites integrados */}
-      {isModalOpen && (
-        <div style={styles.modalOverlay} className={isClosing ? "modal-overlay-fadeout" : "modal-overlay-fade"} onClick={handleCloseModal}>
-          <div style={styles.modalContent} className={isClosing ? "modal-content-popout" : "modal-content-pop"} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.modalHeader}>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <h3 style={{ fontSize: "16px", fontWeight: 700, color: "var(--text-primary)" }}>Fontes de Busca Integradas</h3>
-              </div>
-              <button style={styles.closeBtn} onClick={handleCloseModal}>
-                <X size={16} color="var(--text-secondary)" />
-              </button>
-            </div>
-            <div style={styles.modalBody}>
-              <p style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "20px" }}>
-                PriceScraper realiza consultas paralelas simultâneas e diretas nestas plataformas em tempo real:
-              </p>
-              
-              <div style={styles.sourceList}>
-                {/* Mercado Livre */}
-                <div style={styles.sourceItem}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                    <img src="/platforms/mercadoLivre.png" alt="Mercado Livre" style={styles.sourceLogo} />
-                    <div>
-                      <h4 style={styles.sourceName}>Mercado Livre</h4>
-                      <a href="https://www.mercadolivre.com.br" target="_blank" rel="noopener noreferrer" style={{ ...styles.sourceUrl, textDecoration: "underline" }}>
-                        mercadolivre.com.br
-                      </a>
-                    </div>
-                  </div>
-                  <span style={styles.statusPill}>
-                    <CheckCircle2 size={11} color="var(--success)" />
-                    Ativo
-                  </span>
-                </div>
+      {/* Integrated Platforms Modal Component */}
+      <IntegratedPlatformsModal
+        isOpen={isModalOpen}
+        isClosing={isClosing}
+        onClose={handleCloseModal}
+      />
 
-                {/* OLX */}
-                <div style={styles.sourceItem}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                    <img src="/platforms/olx.png" alt="OLX" style={styles.sourceLogo} />
-                    <div>
-                      <h4 style={styles.sourceName}>OLX Brasil</h4>
-                      <a href="https://www.olx.com.br" target="_blank" rel="noopener noreferrer" style={{ ...styles.sourceUrl, textDecoration: "underline" }}>
-                        olx.com.br
-                      </a>
-                    </div>
-                  </div>
-                  <span style={styles.statusPill}>
-                    <CheckCircle2 size={11} color="var(--success)" />
-                    Ativo
-                  </span>
-                </div>
+      {/* Selected Favorite Product Details Modal */}
+      <ProductDetailsModal
+        item={selectedFavProduct}
+        isFavorite={selectedFavProduct ? favorites.some((f) => getItemKey(f) === getItemKey(selectedFavProduct)) : false}
+        onToggleFavorite={toggleFavorite}
+        onClose={() => setSelectedFavProduct(null)}
+      />
 
-                {/* GGMax */}
-                <div style={styles.sourceItem}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                    <img src="/platforms/ggmax.png" alt="GGMax" style={{ ...styles.sourceLogo, padding: "2px", backgroundColor: "#0a0a10" }} />
-                    <div>
-                      <h4 style={styles.sourceName}>GGMax</h4>
-                      <a href="https://ggmax.com.br" target="_blank" rel="noopener noreferrer" style={{ ...styles.sourceUrl, textDecoration: "underline" }}>
-                        ggmax.com.br
-                      </a>
-                    </div>
-                  </div>
-                  <span style={styles.statusPill}>
-                    <CheckCircle2 size={11} color="var(--success)" />
-                    Ativo
-                  </span>
-                </div>
-
-                {/* Amazon */}
-                <div style={styles.sourceItem}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                    <img src="/platforms/amazon.png" alt="Amazon" style={styles.sourceLogo} />
-                    <div>
-                      <h4 style={styles.sourceName}>Amazon Brasil</h4>
-                      <a href="https://www.amazon.com.br" target="_blank" rel="noopener noreferrer" style={{ ...styles.sourceUrl, textDecoration: "underline" }}>
-                        amazon.com.br
-                      </a>
-                    </div>
-                  </div>
-                  <span style={styles.statusPill}>
-                    <CheckCircle2 size={11} color="var(--success)" />
-                    Ativo
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Product Comparison Side-by-Side Modal */}
+      {isComparisonModalOpen && (
+        <ProductComparisonModal
+          items={comparedItems}
+          onClose={() => setIsComparisonModalOpen(false)}
+          onRemoveItem={toggleCompare}
+        />
       )}
+
+      {/* Auth Modal Component (Login / Signup) */}
+      <AuthModal
+        isOpen={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
+        onLoginSuccess={handleLoginSuccess}
+      />
     </div>
   );
 }
@@ -420,39 +445,18 @@ const styles: Record<string, React.CSSProperties> = {
     backgroundColor: "var(--bg-primary)",
     position: "relative",
   },
-  chatArea: { flex: 1, display: "flex", flexDirection: "column" as const, height: "100%", overflow: "hidden" },
-  topbar: {
-    height: "62px",
-    borderBottom: "1px solid var(--border)",
+  chatArea: {
+    flex: 1,
     display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "0 24px",
-    backgroundColor: "var(--bg-secondary)",
-    flexShrink: 0,
-    position: "relative",
-    zIndex: 10,
-  },
-  brand: { display: "flex", alignItems: "center", gap: "10px" },
-  brandTitle: { fontSize: "16px", fontWeight: 700, color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" },
-  brandBadge: { fontSize: "10px", fontWeight: 600, backgroundColor: "rgba(90,122,106,0.15)", color: "var(--accent)", padding: "2px 8px", borderRadius: "20px" },
-  newSearchBtn: {
-    display: "flex",
-    alignItems: "center",
-    backgroundColor: "var(--btn-gray)",
-    color: "#ffffff",
-    border: "none",
-    borderRadius: "20px",
-    padding: "8px 16px",
-    fontSize: "12px",
-    fontWeight: 600,
-    cursor: "pointer",
-    transition: "var(--transition)",
+    flexDirection: "column" as const,
+    height: "100%",
+    overflow: "hidden",
   },
   messagesContainer: {
     flex: 1,
     overflowY: "auto",
-    padding: "28px 20px",
+    padding: "24px 20px 180px",
+    boxSizing: "border-box" as const,
     display: "flex",
     justifyContent: "center",
   },
@@ -463,43 +467,107 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: "column" as const,
     gap: "24px",
   },
-  messageWrapper: { display: "flex", gap: "14px", width: "100%", animation: "fadeInUp 0.3s ease-out" },
-  avatar: { width: "34px", height: "34px", borderRadius: "50%", backgroundColor: "rgba(108,92,231,0.12)", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--border)", flexShrink: 0, marginTop: "2px" },
-  messageBubbleContainer: { display: "flex", flexDirection: "column" as const, gap: "14px", flex: 1, minWidth: 0 },
-  messageBubble: { padding: "14px 18px", borderRadius: "var(--radius-lg)", fontSize: "14px", lineHeight: "1.6", color: "var(--text-primary)", maxWidth: "100%" },
-  messageText: { whiteSpace: "pre-wrap" as const },
-  loadingDots: { display: "flex", gap: "5px", marginTop: "8px" },
-  dot: { width: "6px", height: "6px", backgroundColor: "var(--accent-light)", borderRadius: "50%", animation: "typingBounce 1.4s infinite ease-in-out", display: "inline-block" },
-  searchMetaCard: { marginTop: "10px", display: "flex", flexWrap: "wrap" as const, gap: "6px", paddingTop: "10px", borderTop: "1px solid var(--border)" },
-  metaBadge: { display: "flex", alignItems: "center", gap: "5px", fontSize: "11px", backgroundColor: "var(--bg-primary)", padding: "3px 9px", borderRadius: "20px", color: "var(--text-secondary)", border: "1px solid var(--border)" },
   controlsArea: {
-    padding: "14px 20px 20px",
-    borderTop: "1px solid var(--border)",
-    backgroundColor: "var(--bg-secondary)",
+    position: "absolute",
+    bottom: "24px",
+    left: "50%",
+    transform: "translateX(-50%)",
+    width: "calc(100% - 32px)",
+    maxWidth: "760px",
+    padding: "8px 12px",
+    backgroundColor: "rgba(255, 255, 255, 0.88)",
+    backdropFilter: "blur(16px)",
+    WebkitBackdropFilter: "blur(16px)",
+    borderRadius: "24px",
+    border: "1px solid rgba(210, 219, 213, 0.8)",
+    boxShadow: "0 12px 36px -4px rgba(0, 0, 0, 0.12), 0 4px 16px rgba(0, 0, 0, 0.04)",
     display: "flex",
     justifyContent: "center",
-    flexShrink: 0,
+    zIndex: 50,
   },
-  searchForm: { width: "100%", maxWidth: "820px", display: "flex", flexDirection: "column" as const, gap: "10px", alignSelf: "stretch" },
-  inputContainer: { display: "flex", width: "100%", backgroundColor: "var(--bg-input)", border: "1px solid var(--border)", borderRadius: "var(--radius-xl)", padding: "4px 6px 4px 18px", alignItems: "center", outline: "none" },
-  mainInput: { flex: 1, backgroundColor: "transparent", border: "none", outline: "none", boxShadow: "none", color: "var(--text-primary)", fontSize: "14px", height: "44px" },
-  sendBtn: { width: "40px", height: "40px", borderRadius: "50%", backgroundColor: "var(--btn-gray)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "var(--transition)" },
-  platformLogoWrapper: { display: "flex", alignItems: "center", gap: "10px", marginTop: "4px", animation: "fadeInUp 0.6s ease-out", cursor: "pointer" },
-  platformLogoText: { fontSize: "12px", color: "var(--text-secondary)", fontWeight: 500 },
-  platformLogoStack: { display: "flex", alignItems: "center" },
-  platformCircle: { width: "26px", height: "26px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 800, marginLeft: "-8px", border: "2.5px solid var(--bg-primary)", userSelect: "none" },
-  
-  // Modal styles
-  modalOverlay: { position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 },
-  modalContent: { backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", width: "100%", maxWidth: "420px", padding: "20px", display: "flex", flexDirection: "column" as const, gap: "16px", boxShadow: "0 20px 40px rgba(0,0,0,0.5)" },
-  modalHeader: { display: "flex", justifyContent: "space-between", alignItems: "center" },
-  closeBtn: { background: "none", display: "flex", alignItems: "center", justifyContent: "center", padding: "4px", borderRadius: "50%", border: "1px solid transparent", transition: "var(--transition)" },
-  modalBody: { display: "flex", flexDirection: "column" as const },
-  sourceList: { display: "flex", flexDirection: "column" as const, gap: "12px" },
-  sourceItem: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px", backgroundColor: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)" },
-  sourceLogo: { width: "28px", height: "28px", borderRadius: "50%", objectFit: "cover" as const },
-  sourceLogoPlaceholder: { width: "28px", height: "28px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "12px", fontWeight: 800 },
-  sourceName: { fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" },
-  sourceUrl: { fontSize: "11px", color: "var(--text-secondary)" },
-  statusPill: { display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "10px", color: "var(--success)", backgroundColor: "rgba(0,184,148,0.1)", padding: "2px 8px", borderRadius: "100px", fontWeight: 600 },
+  searchForm: {
+    width: "100%",
+    maxWidth: "820px",
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "10px",
+    alignSelf: "stretch",
+  },
+  inputContainer: {
+    display: "flex",
+    width: "100%",
+    backgroundColor: "var(--bg-input)",
+    border: "1px solid var(--border)",
+    borderRadius: "var(--radius-xl)",
+    padding: "4px 6px 4px 18px",
+    alignItems: "center",
+    outline: "none",
+  },
+  mainInput: {
+    flex: 1,
+    backgroundColor: "transparent",
+    border: "none",
+    outline: "none",
+    boxShadow: "none",
+    color: "var(--text-primary)",
+    fontSize: "14px",
+    height: "44px",
+  },
+  homeInputBtn: {
+    width: "34px",
+    height: "34px",
+    borderRadius: "50%",
+    backgroundColor: "rgba(90, 122, 106, 0.12)",
+    border: "1px solid rgba(90, 122, 106, 0.3)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    cursor: "pointer",
+    marginRight: "6px",
+    transition: "var(--transition)",
+  },
+  sendBtn: {
+    width: "40px",
+    height: "40px",
+    borderRadius: "50%",
+    backgroundColor: "var(--btn-gray)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    transition: "var(--transition)",
+    border: "none",
+    cursor: "pointer",
+  },
+  platformLogoWrapper: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    marginTop: "4px",
+    animation: "fadeInUp 0.6s ease-out",
+    cursor: "pointer",
+  },
+  platformLogoText: {
+    fontSize: "12px",
+    color: "var(--text-secondary)",
+    fontWeight: 500,
+  },
+  platformLogoStack: {
+    display: "flex",
+    alignItems: "center",
+  },
+  platformCircle: {
+    width: "26px",
+    height: "26px",
+    borderRadius: "50%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "11px",
+    fontWeight: 800,
+    marginLeft: "-8px",
+    border: "2.5px solid var(--bg-primary)",
+    userSelect: "none",
+  },
 };

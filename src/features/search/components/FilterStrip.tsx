@@ -99,6 +99,35 @@ export const FilterStrip: React.FC<FilterStripProps> = ({
           className="custom-select-premium-btn"
         />
       </div>
+
+      {/* Quick Chips */}
+      <div style={styles.quickChipsGroup}>
+        <button
+          type="button"
+          onClick={() => setSortBy("price_asc")}
+          style={{
+            ...styles.chipBtn,
+            backgroundColor: sortBy === "price_asc" ? "rgba(0, 184, 148, 0.12)" : "var(--bg-primary)",
+            color: sortBy === "price_asc" ? "var(--success)" : "var(--text-secondary)",
+            border: sortBy === "price_asc" ? "1px solid rgba(0, 184, 148, 0.4)" : "1px solid var(--border)",
+          }}
+        >
+          <span>📉 Menor Preço</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setSortBy("rating_desc")}
+          style={{
+            ...styles.chipBtn,
+            backgroundColor: sortBy === "rating_desc" ? "rgba(255, 184, 0, 0.12)" : "var(--bg-primary)",
+            color: sortBy === "rating_desc" ? "#d35400" : "var(--text-secondary)",
+            border: sortBy === "rating_desc" ? "1px solid rgba(255, 184, 0, 0.4)" : "1px solid var(--border)",
+          }}
+        >
+          <span>⭐ Avaliação 4.5+</span>
+        </button>
+      </div>
     </div>
   );
 };
@@ -108,5 +137,8 @@ const styles: Record<string, React.CSSProperties> = {
   priceInputs: { display: "flex", alignItems: "center", gap: "6px" },
   priceInput: { width: "70px", backgroundColor: "#ffffff", border: "1px solid var(--border)", borderRadius: "24px", color: "var(--text-primary)", padding: "8px 10px", fontSize: "12px", fontWeight: 600, textAlign: "center" as const, outline: "none", transition: "var(--transition)" },
   priceDivider: { color: "var(--text-muted)", fontSize: "12px" },
+  quickChipsGroup: { display: "flex", alignItems: "center", gap: "6px", marginLeft: "auto" },
+  chipBtn: { borderRadius: "20px", padding: "6px 12px", fontSize: "11px", fontWeight: 700, cursor: "pointer", transition: "var(--transition)" },
 };
+
 export default FilterStrip;

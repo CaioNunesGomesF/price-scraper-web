@@ -1,9 +1,15 @@
 import React from "react";
 import { type ListingItem } from "../../../services/searchApi";
-import { Star, MapPin, ExternalLink } from "lucide-react";
+import { Star, MapPin, Info, Heart, Scale } from "lucide-react";
 
 interface ProductCardProps {
   item: ListingItem;
+  index?: number;
+  isFavorite?: boolean;
+  isCompared?: boolean;
+  onToggleFavorite?: (item: ListingItem, e: React.MouseEvent) => void;
+  onToggleCompare?: (item: ListingItem, e: React.MouseEvent) => void;
+  onSelect?: (item: ListingItem) => void;
 }
 
 const getPlatformStyle = (p: string) => {
@@ -21,15 +27,25 @@ const getPlatformStyle = (p: string) => {
   }
 };
 
-export const ProductCard: React.FC<ProductCardProps> = ({ item }) => {
+export const ProductCard: React.FC<ProductCardProps> = ({
+  item,
+  index = 0,
+  isFavorite = false,
+  isCompared = false,
+  onToggleFavorite,
+  onToggleCompare,
+  onSelect,
+}) => {
   const si = getPlatformStyle(item.platform);
 
   return (
-    <a
-      href={item.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      style={styles.productCard}
+    <div
+      onClick={() => onSelect?.(item)}
+      style={{
+        ...styles.productCard,
+        animation: "cardPopIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both",
+        animationDelay: `${Math.min(index, 12) * 0.05}s`,
+      }}
       className="product-card-hover"
     >
       <div style={styles.imageWrapper}>
@@ -53,6 +69,46 @@ export const ProductCard: React.FC<ProductCardProps> = ({ item }) => {
           )}
           <span>{si.name}</span>
         </div>
+
+        {/* Action Buttons Top Right: Favorite & Compare */}
+        <div style={styles.topActionsGroup}>
+          {onToggleCompare && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleCompare(item, e);
+              }}
+              style={{
+                ...styles.actionBtn,
+                backgroundColor: isCompared ? "var(--accent)" : "rgba(0, 0, 0, 0.45)",
+                border: isCompared ? "1px solid var(--accent)" : "1px solid rgba(255, 255, 255, 0.25)",
+              }}
+              title={isCompared ? "Remover da comparação" : "Adicionar para comparar"}
+            >
+              <Scale size={13} color="#ffffff" />
+            </button>
+          )}
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFavorite?.(item, e);
+            }}
+            style={{
+              ...styles.actionBtn,
+              backgroundColor: isFavorite ? "rgba(231, 76, 60, 0.18)" : "rgba(0, 0, 0, 0.45)",
+              border: isFavorite ? "1px solid rgba(231, 76, 60, 0.5)" : "1px solid rgba(255, 255, 255, 0.25)",
+            }}
+            title={isFavorite ? "Remover dos favoritos" : "Salvar nos favoritos"}
+          >
+            <Heart
+              size={13}
+              color={isFavorite ? "#e74c3c" : "#ffffff"}
+              fill={isFavorite ? "#e74c3c" : "none"}
+            />
+          </button>
+        </div>
+
         {item.condition && (
           <div style={styles.conditionTag}>
             {item.condition}
@@ -96,11 +152,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({ item }) => {
         )}
 
         <div style={styles.goBtn}>
-          <span>Ver Oferta</span>
-          <ExternalLink size={13} />
+          <span>Ver Detalhes</span>
+          <Info size={13} />
         </div>
       </div>
-    </a>
+    </div>
   );
 };
 
@@ -114,13 +170,16 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: "column" as const,
     transition: "var(--transition)",
     height: "100%",
+    cursor: "pointer",
   },
   imageWrapper: { position: "relative" as const, width: "100%", paddingBottom: "90%", backgroundColor: "#08080f" },
   productImage: { position: "absolute" as const, top: 0, left: 0, width: "100%", height: "100%", objectFit: "contain" as const, padding: "8px" },
   noImage: { position: "absolute" as const, top: "50%", left: "50%", transform: "translate(-50%,-50%)", color: "var(--text-muted)", fontSize: "11px" },
-  platformTag: { position: "absolute" as const, top: "8px", left: "8px", fontSize: "10px", fontWeight: 700, padding: "2px 7px", borderRadius: "20px", display: "flex", alignItems: "center", gap: "4px" },
+  platformTag: { position: "absolute" as const, top: "8px", left: "8px", fontSize: "10px", fontWeight: 700, padding: "2px 7px", borderRadius: "20px", display: "flex", alignItems: "center", gap: "4px", zIndex: 2 },
+  topActionsGroup: { position: "absolute" as const, top: "8px", right: "8px", display: "flex", alignItems: "center", gap: "6px", zIndex: 3 },
+  actionBtn: { width: "26px", height: "26px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)", cursor: "pointer", transition: "transform 0.2s ease" },
   conditionTag: { position: "absolute" as const, bottom: "8px", right: "8px", backgroundColor: "rgba(0,0,0,0.6)", color: "#fff", fontSize: "10px", padding: "1px 6px", borderRadius: "4px" },
-  productInfo: { padding: "12px", display: "flex", flexDirection: "column" as const, flex: 1, gap: "4px" },
+  productInfo: { padding: "14px", display: "flex", flexDirection: "column" as const, flex: 1, gap: "6px" },
   productTitle: { fontSize: "12px", fontWeight: 600, color: "var(--text-primary)", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, marginBottom: "4px", lineHeight: "1.4" },
   priceRow: { display: "flex", alignItems: "baseline", gap: "3px", marginBottom: "2px" },
   currencySymbol: { fontSize: "11px", color: "var(--accent-light)", fontWeight: 700 },
@@ -131,6 +190,7 @@ const styles: Record<string, React.CSSProperties> = {
   sellerName: { fontSize: "11px", color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const },
   locationRow: { display: "flex", alignItems: "center", gap: "4px", color: "var(--text-secondary)", fontSize: "11px" },
   locationText: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const },
-  goBtn: { marginTop: "auto", backgroundColor: "var(--bg-input)", border: "1px solid var(--border)", color: "var(--text-primary)", padding: "6px 12px", borderRadius: "var(--radius-sm)", fontSize: "12px", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: "5px", transition: "var(--transition)" },
+  goBtn: { marginTop: "auto", backgroundColor: "var(--bg-input)", border: "1px solid var(--border)", color: "var(--text-primary)", padding: "7px 12px", borderRadius: "var(--radius-sm)", fontSize: "12px", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: "5px", transition: "var(--transition)" },
 };
+
 export default ProductCard;

@@ -1,12 +1,14 @@
 import axios from "axios";
+import { getMockSearchResults } from "../mocks/mockListings";
 
 const api = axios.create({
   baseURL: "http://localhost:3000/api/v1",
-  timeout: 35000,
+  timeout: 3000, // Short timeout for auto-fallback to mock
   headers: { "Content-Type": "application/json" },
 });
 
 export interface ListingItem {
+  id?: string;
   platform: "MERCADO_LIVRE" | "OLX" | "GGMAX" | "AMAZON" | "OUTROS";
   externalId?: string;
   title: string;
@@ -67,13 +69,74 @@ export interface SearchParams {
   limit?: number;
 }
 
+// Configuração para ativar ou desativar o modo Mock explicitamente se desejado
+export const MOCK_MODE = true;
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export const searchApi = {
-  search: (params: SearchParams) =>
-    api.get<SearchResponse>("/search", { params }).then((r) => r.data),
+  search: async (params: SearchParams): Promise<SearchResponse> => {
+    if (MOCK_MODE) {
+      await delay(700); // Simular latência de busca em tempo real
+      return getMockSearchResults(params);
+    }
 
-  getTopSearches: (limit = 10) =>
-    api.get<TopSearchesResponse>("/search/analytics/top", { params: { limit } }).then((r) => r.data),
+    try {
+      const response = await api.get<SearchResponse>("/search", { params });
+      return response.data;
+    } catch (error) {
+      console.warn("Backend offline or unreachable, falling back to mock data.", error);
+      await delay(600);
+      return getMockSearchResults(params);
+    }
+  },
 
-  getCategories: () =>
-    api.get<CategoriesResponse>("/search/analytics/categories").then((r) => r.data),
+  getTopSearches: async (limit = 10): Promise<TopSearchesResponse> => {
+    if (MOCK_MODE) {
+      await delay(400);
+      return {
+        status: "success",
+        total: 3,
+        data: [
+          { query: "iPhone 13", category: "ELETRONICOS", searchCount: 142, lastSearchedAt: new Date().toISOString() },
+          { query: "Conta Valorant", category: "JOGOS", searchCount: 98, lastSearchedAt: new Date().toISOString() },
+          { query: "Honda Civic", category: "VEICULOS", searchCount: 65, lastSearchedAt: new Date().toISOString() },
+        ],
+      };
+    }
+
+    try {
+      const res = await api.get<TopSearchesResponse>("/search/analytics/top", { params: { limit } });
+      return res.data;
+    } catch {
+      return {
+        status: "success",
+        total: 3,
+        data: [
+          { query: "iPhone 13", category: "ELETRONICOS", searchCount: 142, lastSearchedAt: new Date().toISOString() },
+          { query: "Conta Valorant", category: "JOGOS", searchCount: 98, lastSearchedAt: new Date().toISOString() },
+        ],
+      };
+    }
+  },
+
+  getCategories: async (): Promise<CategoriesResponse> => {
+    if (MOCK_MODE) {
+      await delay(300);
+      return {
+        status: "success",
+        data: { ELETRONICOS: 45, JOGOS: 30, VEICULOS: 15, IMOVEIS: 10, OUTROS: 20 },
+      };
+    }
+
+    try {
+      const res = await api.get<CategoriesResponse>("/search/analytics/categories");
+      return res.data;
+    } catch {
+      return {
+        status: "success",
+        data: { ELETRONICOS: 45, JOGOS: 30, VEICULOS: 15, IMOVEIS: 10, OUTROS: 20 },
+      };
+    }
+  },
 };
